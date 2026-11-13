@@ -466,13 +466,19 @@ function App() {
           const ringRadius = latitudeCurve * radius
           const fontSize = radius * (0.11 + latitudeCurve * 0.12)
           context.font = `500 ${fontSize}px Arial, sans-serif`
+          const letterSpacing = fontSize * 0.08
           const separator = '     '
           const source = `${line}${separator}`
-          const sourceWidth = context.measureText(source).width
+          const sourceWidth = [...source].reduce(
+            (width, character) => width + context.measureText(character).width + letterSpacing,
+            0,
+          )
           const circumference = Math.PI * 2 * Math.max(ringRadius, 1)
           const repeatCount = Math.max(2, Math.ceil(circumference / Math.max(sourceWidth, 1)) + 1)
           const characters = [...source.repeat(repeatCount)]
-          const widths = characters.map((character) => context.measureText(character).width)
+          const widths = characters.map(
+            (character) => context.measureText(character).width + letterSpacing,
+          )
           let cursor = 0
 
           characters.forEach((character, characterIndex) => {
