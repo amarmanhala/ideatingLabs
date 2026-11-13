@@ -116,6 +116,8 @@ function App() {
     let lastSoundAt = 0
     let initialized = false
     let deformations = new Map<Ball, { amount: number; angle: number }>()
+    let activeBallContacts = new Set<string>()
+    const lastBallImpactAt = new Map<string, number>()
     const clickBounces = new Map<Ball, number>()
 
     const createBalls = () => {
@@ -520,6 +522,7 @@ function App() {
 
       const steps = 3
       const step = delta / steps
+      const contactsThisFrame = new Set<string>()
       for (let simulationStep = 0; simulationStep < steps; simulationStep += 1) {
         balls.forEach((ball) => {
           const deformation = deformations.get(ball)
@@ -605,22 +608,30 @@ function App() {
             const distance = Math.hypot(dx, dy) || 0.001
             const minimum = a.radius + b.radius
             if (distance >= minimum) continue
+            const contactKey = `${i}:${j}`
+            const isNewContact = !activeBallContacts.has(contactKey) &&
+              !contactsThisFrame.has(contactKey)
+            contactsThisFrame.add(contactKey)
             const nx = dx / distance
             const ny = dy / distance
             const overlap = minimum - distance
+            const relativeVelocityX = b.vx - a.vx
+            const relativeVelocityY = b.vy - a.vy
+            const velocityAlongNormal = relativeVelocityX * nx + relativeVelocityY * ny
+            const impactSpeed = Math.max(0, -velocityAlongNormal)
             const collisionBend = clamp(
-              0.035 + overlap / Math.min(a.radius, b.radius) * 0.16,
-              0.035,
+              overlap / Math.min(a.radius, b.radius) * 0.12 + impactSpeed / 2600,
+              0,
               0.15,
             )
             const collisionAngle = Math.atan2(ny, nx)
             const deformationA = deformations.get(a)
             const deformationB = deformations.get(b)
-            if (deformationA && collisionBend > deformationA.amount) {
+            if (deformationA && collisionBend > 0.008 && collisionBend > deformationA.amount) {
               deformationA.amount = collisionBend
               deformationA.angle = collisionAngle
             }
-            if (deformationB && collisionBend > deformationB.amount) {
+            if (deformationB && collisionBend > 0.008 && collisionBend > deformationB.amount) {
               deformationB.amount = collisionBend
               deformationB.angle = collisionAngle
             }
@@ -636,11 +647,8 @@ function App() {
               b.y += ny * overlap * share
             }
 
-            const relativeVelocityX = b.vx - a.vx
-            const relativeVelocityY = b.vy - a.vy
-            const velocityAlongNormal = relativeVelocityX * nx + relativeVelocityY * ny
             if (velocityAlongNormal > 0) continue
-            const restitution = 0.86
+            const restitution = impactSpeed < 110 ? 0.08 : 0.86
             const inverseMassA = a === draggedBall ? 0 : 1 / a.mass
             const inverseMassB = b === draggedBall ? 0 : 1 / b.mass
             const impulse =
@@ -656,10 +664,15 @@ function App() {
               b.vx += impulseX * inverseMassB
               b.vy += impulseY * inverseMassB
             }
-            registerImpact(Math.abs(velocityAlongNormal), true)
+            const lastPairImpact = lastBallImpactAt.get(contactKey) ?? -Infinity
+            if (isNewContact && impactSpeed >= 80 && now - lastPairImpact > 900) {
+              lastBallImpactAt.set(contactKey, now)
+              registerImpact(impactSpeed, true)
+            }
           }
         }
       }
+      activeBallContacts = contactsThisFrame
 
       balls.forEach((ball) => drawSphere(ball, foreground, background, palettePulse, now))
       frame = requestAnimationFrame(render)
