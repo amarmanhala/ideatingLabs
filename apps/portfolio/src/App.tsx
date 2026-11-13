@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
 type Point = { x: number; y: number }
-type BallKind = 'instagram' | 'story' | 'x' | 'email'
+type BallKind = 'instagram' | 'story' | 'projects' | 'x' | 'email'
 
 type Ball = Point & {
   vx: number
@@ -119,12 +119,14 @@ function App() {
 
     const createBalls = () => {
       const small = clamp(Math.min(width * 0.085, height * 0.13), 62, 142)
+      const medium = small * 1.18
       const large = clamp(Math.min(width * 0.15, height * 0.23), 120, 238)
       const floor = height - Math.max(18, height * 0.026)
       const left = Math.max(small + 20, width * 0.105)
-      const center = width < 720 ? width * 0.5 : width * 0.405
-      const rightA = width < 720 ? width * 0.72 : width * 0.72
-      const rightB = width < 720 ? width * 0.84 : width * 0.89
+      const center = width < 720 ? width * 0.5 : width * 0.31
+      const projects = width < 720 ? width * 0.76 : width * 0.555
+      const rightA = width < 720 ? width * 0.72 : width * 0.74
+      const rightB = width < 720 ? width * 0.84 : width * 0.91
 
       balls = [
         {
@@ -134,6 +136,10 @@ function App() {
         {
           kind: 'story', x: center, y: floor - large, vx: 0, vy: 0,
           radius: large, mass: large * large * 1.18, rotationX: -0.12, rotationY: 0.2,
+        },
+        {
+          kind: 'projects', x: projects, y: floor - medium, vx: 0, vy: 0,
+          radius: medium, mass: medium * medium, rotationX: 0, rotationY: 0,
         },
         {
           kind: 'x', x: rightA, y: floor - small, vx: 0, vy: 0,
@@ -153,10 +159,12 @@ function App() {
         balls[0].y = floor - small
         balls[1].x = width * 0.48
         balls[1].y = floor - large * 1.02
-        balls[2].x = width * 0.73
-        balls[2].y = floor - small * 1.92
-        balls[3].x = width * 0.83
-        balls[3].y = floor - small * 0.82
+        balls[2].x = width * 0.76
+        balls[2].y = floor - medium * 3.1
+        balls[3].x = width * 0.73
+        balls[3].y = floor - small * 1.92
+        balls[4].x = width * 0.83
+        balls[4].y = floor - small * 0.82
       }
 
       for (let pass = 0; pass < 8; pass += 1) {
@@ -342,9 +350,10 @@ function App() {
         context.font = `300 ${radius * 1.16}px Arial, sans-serif`
         context.fillText('𝕏', 0, radius * 0.02)
         context.restore()
-      } else if (ball.kind === 'email') {
-        const label = 'email'
-        context.font = `400 ${radius * 0.43}px Arial, sans-serif`
+      } else if (ball.kind === 'email' || ball.kind === 'projects') {
+        const label = ball.kind === 'projects' ? 'projects' : 'email'
+        const fontScale = ball.kind === 'projects' ? 0.34 : 0.43
+        context.font = `400 ${radius * fontScale}px Arial, sans-serif`
         const characters = [...label]
         const widths = characters.map((character) => context.measureText(character).width)
         const totalWidth = widths.reduce((sum, characterWidth) => sum + characterWidth, 0)
@@ -703,7 +712,7 @@ function App() {
       <canvas
         ref={canvasRef}
         className="physics-stage"
-        aria-label="Interactive portfolio playground. Drag and throw the four balls to make them collide."
+        aria-label="Interactive portfolio playground. Drag and throw the five balls to make them collide."
       />
       <header className="site-header" aria-hidden="true">
         <div className="wordmark"><span className="wordmark-dot" />AMAR / PORTFOLIO</div>
