@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
 type Point = { x: number; y: number }
-type BallKind = 'github' | 'story' | 'projects' | 'x' | 'email'
+type BallKind = 'github' | 'story' | 'notes' | 'x' | 'email'
 
 type Ball = Point & {
   vx: number
@@ -155,7 +155,7 @@ function App() {
       const floor = height - Math.max(18, height * 0.026)
       const left = Math.max(small + 20, width * 0.105)
       const center = width < 720 ? width * 0.5 : width * 0.31
-      const projects = width < 720 ? width * 0.76 : width * 0.555
+      const notes = width < 720 ? width * 0.76 : width * 0.555
       const rightA = width < 720 ? width * 0.72 : width * 0.74
       const rightB = width < 720 ? width * 0.84 : width * 0.91
 
@@ -169,7 +169,7 @@ function App() {
           radius: large, mass: large * large * 1.18, rotationX: -0.12, rotationY: 0.2,
         },
         {
-          kind: 'projects', x: projects, y: floor - medium, vx: 0, vy: 0,
+          kind: 'notes', x: notes, y: floor - medium, vx: 0, vy: 0,
           radius: medium, mass: medium * medium, rotationX: 0, rotationY: 0,
         },
         {
@@ -422,10 +422,37 @@ function App() {
         context.font = `300 ${radius * 1.16}px Arial, sans-serif`
         context.fillText('𝕏', 0, radius * 0.02)
         context.restore()
-      } else if (ball.kind === 'email' || ball.kind === 'projects') {
-        const label = ball.kind === 'projects' ? 'projects' : 'email'
-        const fontScale = ball.kind === 'projects' ? 0.34 : 0.43
-        context.font = `400 ${radius * fontScale}px Arial, sans-serif`
+      } else if (ball.kind === 'notes') {
+        const iconSize = radius * 0.34
+        const iconLeft = -iconSize * 0.5
+        const iconTop = -radius * 0.63
+        context.save()
+        context.strokeStyle = background
+        context.lineWidth = radius * 0.035
+        context.lineCap = 'round'
+        context.lineJoin = 'round'
+        context.beginPath()
+        context.roundRect(iconLeft, iconTop, iconSize, iconSize, radius * 0.035)
+        context.stroke()
+        ;[0.35, 0.56, 0.77].forEach((line, index) => {
+          context.beginPath()
+          context.moveTo(iconLeft + iconSize * 0.2, iconTop + iconSize * line)
+          context.lineTo(
+            iconLeft + iconSize * (index === 2 ? 0.62 : 0.8),
+            iconTop + iconSize * line,
+          )
+          context.stroke()
+        })
+        context.restore()
+
+        context.fillStyle = background
+        context.font = `400 ${radius * 0.32}px Arial, sans-serif`
+        context.fillText('notes', 0, radius * 0.04)
+        context.font = `500 ${radius * 0.11}px Arial, sans-serif`
+        context.fillText('project', 0, radius * 0.34)
+      } else if (ball.kind === 'email') {
+        const label = 'email'
+        context.font = `400 ${radius * 0.43}px Arial, sans-serif`
         const characters = [...label]
         const widths = characters.map((character) => context.measureText(character).width)
         const totalWidth = widths.reduce((sum, characterWidth) => sum + characterWidth, 0)
@@ -831,7 +858,7 @@ function App() {
       <canvas
         ref={canvasRef}
         className="physics-stage"
-        aria-label="Interactive portfolio playground. Tap the GitHub, X, or email balls to open their links, or drag and throw any ball."
+        aria-label="Interactive portfolio playground with a Notes project ball. Tap the GitHub, X, or email balls to open their links, or drag and throw any ball."
       />
       <header className="site-header">
         <div className="wordmark" aria-hidden="true">
