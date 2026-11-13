@@ -20,6 +20,11 @@ type Palette = {
   name: string
 }
 
+type AudioControls = {
+  start: () => Promise<boolean>
+  stop: () => void
+}
+
 const PALETTES: Palette[] = [
   { background: '#00452f', foreground: '#ffe85a', name: 'forest + sun' },
   { background: '#f3f3f2', foreground: '#df4500', name: 'paper + ember' },
@@ -98,8 +103,21 @@ const createSilentAudioUrl = () => {
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const audioControlsRef = useRef<AudioControls | null>(null)
+  const soundEnabledRef = useRef(true)
   const [paletteIndex, setPaletteIndex] = useState(0)
-  const [soundReady, setSoundReady] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(true)
+
+  const toggleSound = () => {
+    const enabled = !soundEnabledRef.current
+    soundEnabledRef.current = enabled
+    setSoundEnabled(enabled)
+    if (enabled) {
+      void audioControlsRef.current?.start()
+    } else {
+      audioControlsRef.current?.stop()
+    }
+  }
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -117,7 +135,6 @@ function App() {
     let previousPalette = 0
     let paletteChangedAt = -1000
     let audioContext: AudioContext | null = null
-    let audioStateListener: (() => void) | null = null
     let mediaUnlock: HTMLAudioElement | null = null
     let mediaUnlockUrl: string | null = null
     let balls: Ball[] = []
@@ -227,11 +244,9 @@ function App() {
       }
     }
 
-    const syncSoundState = () => {
-      setSoundReady(audioContext?.state === 'running')
-    }
-
     const ensureAudio = (): Promise<boolean> => {
+      if (!soundEnabledRef.current) return Promise.resolve(false)
+
       if (!mediaUnlock) {
         mediaUnlockUrl = createSilentAudioUrl()
         mediaUnlock = new Audio(mediaUnlockUrl)
@@ -248,8 +263,6 @@ function App() {
           }).webkitAudioContext
         if (!AudioContextConstructor) return Promise.resolve(false)
         audioContext = new AudioContextConstructor()
-        audioStateListener = syncSoundState
-        audioContext.addEventListener('statechange', audioStateListener)
       }
 
       if (audioContext.state === 'closed') return Promise.resolve(false)
@@ -267,7 +280,6 @@ function App() {
       unlockSource.start(0)
 
       if (audioContext.state === 'running') {
-        syncSoundState()
         return mediaReady.then(() => true)
       }
 
@@ -278,13 +290,12 @@ function App() {
 
       return Promise.all([mediaReady, contextReady])
         .then(([, resumed]) => {
-          if (audioContext === contextToResume) syncSoundState()
           return resumed && contextToResume.state === 'running'
         })
     }
 
     const playImpact = (strength: number) => {
-      if (!audioContext || audioContext.state !== 'running') return
+      if (!soundEnabledRef.current || !audioContext || audioContext.state !== 'running') return
       const now = audioContext.currentTime
       const volume = clamp(strength / 1800, 0.018, 0.12)
       const hardness = 0.98 + Math.random() * 0.04
@@ -323,6 +334,13 @@ function App() {
       })
 
     }
+
+    const stopAudio = () => {
+      if (mediaUnlock) mediaUnlock.pause()
+      if (audioContext?.state === 'running') void audioContext.suspend()
+    }
+
+    audioControlsRef.current = { start: ensureAudio, stop: stopAudio }
 
     const registerImpact = (strength: number, isBallCollision = false) => {
       const now = performance.now()
@@ -786,14 +804,10 @@ function App() {
       canvas.removeEventListener('pointerup', releasePointer)
       canvas.removeEventListener('pointercancel', releasePointer)
       canvas.removeEventListener('click', onAudioGesture)
+      audioControlsRef.current = null
       if (mediaUnlock) mediaUnlock.pause()
       if (mediaUnlockUrl) URL.revokeObjectURL(mediaUnlockUrl)
-      if (audioContext) {
-        if (audioStateListener) {
-          audioContext.removeEventListener('statechange', audioStateListener)
-        }
-        void audioContext.close()
-      }
+      if (audioContext) void audioContext.close()
     }
   }, [])
 
@@ -804,12 +818,32 @@ function App() {
         className="physics-stage"
         aria-label="Interactive portfolio playground. Drag and throw the five balls to make them collide."
       />
-      <header className="site-header" aria-hidden="true">
-        <div className="wordmark">DESIGNER / DEVELOPER / DESIGN ENGINEER</div>
-        <div className="interaction-note">
-          <span>{soundReady ? 'sound on' : 'drag to begin'}</span>
-          <span>click · drag · collide</span>
+      <header className="site-header">
+        <div className="wordmark" aria-hidden="true">
+          DESIGNER / DEVELOPER / DESIGN ENGINEER
         </div>
+        <button
+          type="button"
+          className="sound-toggle"
+          onClick={toggleSound}
+          aria-label={soundEnabled ? 'Turn sound off' : 'Turn sound on'}
+          aria-pressed={soundEnabled}
+          title={soundEnabled ? 'Turn sound off' : 'Turn sound on'}
+        >
+          {soundEnabled ? (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M11 5 6 9H2v6h4l5 4V5Z" />
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M11 5 6 9H2v6h4l5 4V5Z" />
+              <path d="m22 9-6 6" />
+              <path d="m16 9 6 6" />
+            </svg>
+          )}
+        </button>
       </header>
       <div className="palette-status" aria-live="polite">
         <span>{String(paletteIndex + 1).padStart(2, '0')}</span>
