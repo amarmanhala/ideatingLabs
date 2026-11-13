@@ -17,6 +17,7 @@
   user-select: none;
 }
 
+.physics-stage.is-link { cursor: pointer; }
 .physics-stage.is-dragging { cursor: grabbing; }
 
 .site-header,

@@ -25,6 +25,12 @@ type AudioControls = {
   stop: () => void
 }
 
+const BALL_LINKS: Partial<Record<BallKind, string>> = {
+  github: 'https://github.com/amarmanhala',
+  x: 'https://x.com/amarsinghca?s=11',
+  email: 'mailto:amar.manhala@gmail.com',
+}
+
 const PALETTES: Palette[] = [
   { background: '#00452f', foreground: '#ffe85a', name: 'forest + sun' },
   { background: '#f3f3f2', foreground: '#df4500', name: 'paper + ember' },
@@ -712,6 +718,16 @@ function App() {
 
     const getPointer = (event: PointerEvent): Point => ({ x: event.clientX, y: event.clientY })
 
+    const openBallLink = (ball: Ball) => {
+      const href = BALL_LINKS[ball.kind]
+      if (!href) return
+      const link = document.createElement('a')
+      link.href = href
+      link.target = href.startsWith('mailto:') ? '_self' : '_blank'
+      link.rel = 'noopener noreferrer'
+      link.click()
+    }
+
     const onPointerDown = (event: PointerEvent) => {
       void ensureAudio()
       pointer = getPointer(event)
@@ -728,8 +744,15 @@ function App() {
     }
 
     const onPointerMove = (event: PointerEvent) => {
-      if (!draggedBall) return
       pointer = getPointer(event)
+      if (!draggedBall) {
+        const isOverLink = balls.some(
+          (ball) => BALL_LINKS[ball.kind] &&
+            Math.hypot(pointer.x - ball.x, pointer.y - ball.y) <= ball.radius,
+        )
+        canvas.classList.toggle('is-link', isOverLink)
+        return
+      }
       const now = performance.now()
       pointerHistory.push({ ...pointer, time: now })
       pointerHistory = pointerHistory.filter((sample) => now - sample.time < 120)
@@ -752,6 +775,7 @@ function App() {
         void ensureAudio().then((ready) => {
           if (ready) playImpact(140)
         })
+        openBallLink(releasedBall)
       } else {
         const velocitySamples = [
           ...pointerHistory.filter((sample) => now - sample.time <= 110),
@@ -780,6 +804,8 @@ function App() {
     canvas.addEventListener('pointermove', onPointerMove)
     canvas.addEventListener('pointerup', releasePointer)
     canvas.addEventListener('pointercancel', releasePointer)
+    const onPointerLeave = () => { canvas.classList.remove('is-link') }
+    canvas.addEventListener('pointerleave', onPointerLeave)
     const onAudioGesture = () => { void ensureAudio() }
     canvas.addEventListener('click', onAudioGesture)
     frame = requestAnimationFrame(render)
@@ -791,6 +817,7 @@ function App() {
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', releasePointer)
       canvas.removeEventListener('pointercancel', releasePointer)
+      canvas.removeEventListener('pointerleave', onPointerLeave)
       canvas.removeEventListener('click', onAudioGesture)
       audioControlsRef.current = null
       if (mediaUnlock) mediaUnlock.pause()
@@ -804,7 +831,7 @@ function App() {
       <canvas
         ref={canvasRef}
         className="physics-stage"
-        aria-label="Interactive portfolio playground. Drag and throw the five balls to make them collide."
+        aria-label="Interactive portfolio playground. Tap the GitHub, X, or email balls to open their links, or drag and throw any ball."
       />
       <header className="site-header">
         <div className="wordmark" aria-hidden="true">
