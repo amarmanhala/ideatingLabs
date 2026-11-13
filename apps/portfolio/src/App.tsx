@@ -29,23 +29,7 @@ const PALETTES: Palette[] = [
   { background: '#ffe85a', foreground: '#00452f', name: 'sun + forest' },
 ]
 
-const SURFACE_WORDS = ['Amarpree Singh', 'Designer', 'Developer', 'Design Engineer']
-
-function shuffled<T>(values: T[]) {
-  const result = [...values]
-  for (let index = result.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1))
-    ;[result[index], result[randomIndex]] = [result[randomIndex], result[index]]
-  }
-  return result
-}
-
-const STORY_LINES = shuffled(
-  Array.from(
-    { length: 11 },
-    (_, index) => SURFACE_WORDS[index % SURFACE_WORDS.length],
-  ),
-)
+const STORY_LINES = Array.from({ length: 11 }, () => 'Amarpreet Singh')
 const STORY_BAND_OFFSETS = STORY_LINES.map(() => Math.random() * Math.PI * 2)
 
 const clamp = (value: number, min: number, max: number) =>
@@ -83,6 +67,35 @@ const roundedRect = (
   context.roundRect(x, y, width, height, radius)
 }
 
+const createSilentAudioUrl = () => {
+  const sampleRate = 8000
+  const sampleCount = sampleRate / 4
+  const dataLength = sampleCount * 2
+  const wav = new ArrayBuffer(44 + dataLength)
+  const view = new DataView(wav)
+  const writeText = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index += 1) {
+      view.setUint8(offset + index, value.charCodeAt(index))
+    }
+  }
+
+  writeText(0, 'RIFF')
+  view.setUint32(4, 36 + dataLength, true)
+  writeText(8, 'WAVE')
+  writeText(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, 1, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true)
+  view.setUint16(32, 2, true)
+  view.setUint16(34, 16, true)
+  writeText(36, 'data')
+  view.setUint32(40, dataLength, true)
+
+  return URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }))
+}
+
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [paletteIndex, setPaletteIndex] = useState(0)
@@ -105,6 +118,8 @@ function App() {
     let paletteChangedAt = -1000
     let audioContext: AudioContext | null = null
     let audioStateListener: (() => void) | null = null
+    let mediaUnlock: HTMLAudioElement | null = null
+    let mediaUnlockUrl: string | null = null
     let balls: Ball[] = []
     let draggedBall: Ball | null = null
     let pointer: Point = { x: 0, y: 0 }
@@ -216,19 +231,28 @@ function App() {
       setSoundReady(audioContext?.state === 'running')
     }
 
-    const ensureAudio = () => {
+    const ensureAudio = (): Promise<boolean> => {
+      if (!mediaUnlock) {
+        mediaUnlockUrl = createSilentAudioUrl()
+        mediaUnlock = new Audio(mediaUnlockUrl)
+        mediaUnlock.loop = true
+        mediaUnlock.preload = 'auto'
+        mediaUnlock.setAttribute('playsinline', '')
+      }
+      const mediaReady = mediaUnlock.play().catch(() => undefined)
+
       if (!audioContext) {
         const AudioContextConstructor = window.AudioContext ||
           (window as typeof window & {
             webkitAudioContext?: typeof AudioContext
           }).webkitAudioContext
-        if (!AudioContextConstructor) return
+        if (!AudioContextConstructor) return Promise.resolve(false)
         audioContext = new AudioContextConstructor()
         audioStateListener = syncSoundState
         audioContext.addEventListener('statechange', audioStateListener)
       }
 
-      if (audioContext.state === 'closed') return
+      if (audioContext.state === 'closed') return Promise.resolve(false)
 
       // iOS Safari will often create a suspended context until audio is
       // started inside the same user gesture. A silent source unlocks the
@@ -244,16 +268,18 @@ function App() {
 
       if (audioContext.state === 'running') {
         syncSoundState()
-        return
+        return mediaReady.then(() => true)
       }
 
       const contextToResume = audioContext
-      void contextToResume.resume()
-        .then(() => {
+      const contextReady = contextToResume.resume()
+        .then(() => true)
+        .catch(() => false)
+
+      return Promise.all([mediaReady, contextReady])
+        .then(([, resumed]) => {
           if (audioContext === contextToResume) syncSoundState()
-        })
-        .catch(() => {
-          if (audioContext === contextToResume) setSoundReady(false)
+          return resumed && contextToResume.state === 'running'
         })
     }
 
@@ -681,7 +707,7 @@ function App() {
     const getPointer = (event: PointerEvent): Point => ({ x: event.clientX, y: event.clientY })
 
     const onPointerDown = (event: PointerEvent) => {
-      ensureAudio()
+      void ensureAudio()
       pointer = getPointer(event)
       draggedBall = [...balls].reverse().find(
         (ball) => Math.hypot(pointer.x - ball.x, pointer.y - ball.y) <= ball.radius,
@@ -717,6 +743,9 @@ function App() {
         clickBounces.set(releasedBall, now)
         releasedBall.vx *= 0.35
         releasedBall.vy = Math.min(releasedBall.vy, 0) - Math.min(145, releasedBall.radius * 1.05)
+        void ensureAudio().then((ready) => {
+          if (ready) playImpact(140)
+        })
       } else {
         const velocitySamples = [
           ...pointerHistory.filter((sample) => now - sample.time <= 110),
@@ -745,7 +774,8 @@ function App() {
     canvas.addEventListener('pointermove', onPointerMove)
     canvas.addEventListener('pointerup', releasePointer)
     canvas.addEventListener('pointercancel', releasePointer)
-    canvas.addEventListener('click', ensureAudio)
+    const onAudioGesture = () => { void ensureAudio() }
+    canvas.addEventListener('click', onAudioGesture)
     frame = requestAnimationFrame(render)
 
     return () => {
@@ -755,7 +785,9 @@ function App() {
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', releasePointer)
       canvas.removeEventListener('pointercancel', releasePointer)
-      canvas.removeEventListener('click', ensureAudio)
+      canvas.removeEventListener('click', onAudioGesture)
+      if (mediaUnlock) mediaUnlock.pause()
+      if (mediaUnlockUrl) URL.revokeObjectURL(mediaUnlockUrl)
       if (audioContext) {
         if (audioStateListener) {
           audioContext.removeEventListener('statechange', audioStateListener)
@@ -773,7 +805,7 @@ function App() {
         aria-label="Interactive portfolio playground. Drag and throw the five balls to make them collide."
       />
       <header className="site-header" aria-hidden="true">
-        <div className="wordmark"><span className="wordmark-dot" />AMAR / PORTFOLIO</div>
+        <div className="wordmark">DESIGNER / DEVELOPER / DESIGN ENGINEER</div>
         <div className="interaction-note">
           <span>{soundReady ? 'sound on' : 'drag to begin'}</span>
           <span>click · drag · collide</span>

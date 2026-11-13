@@ -42,8 +42,7 @@
   justify-content: space-between;
 }
 
-.wordmark { display: flex; align-items: center; gap: 0.7rem; font-weight: 600; }
-.wordmark-dot { width: 0.52rem; height: 0.52rem; border-radius: 50%; background: currentColor; }
+.wordmark { font-weight: 600; }
 .interaction-note { display: grid; gap: 0.55rem; text-align: right; }
 .interaction-note span:first-child { opacity: 0.55; }
 
