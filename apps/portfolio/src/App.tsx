@@ -104,6 +104,7 @@ function App() {
     let previousPalette = 0
     let paletteChangedAt = -1000
     let audioContext: AudioContext | null = null
+    let audioStateListener: (() => void) | null = null
     let balls: Ball[] = []
     let draggedBall: Ball | null = null
     let pointer: Point = { x: 0, y: 0 }
@@ -209,12 +210,49 @@ function App() {
       }
     }
 
+    const syncSoundState = () => {
+      setSoundReady(audioContext?.state === 'running')
+    }
+
     const ensureAudio = () => {
       if (!audioContext) {
-        audioContext = new AudioContext()
-        setSoundReady(true)
+        const AudioContextConstructor = window.AudioContext ||
+          (window as typeof window & {
+            webkitAudioContext?: typeof AudioContext
+          }).webkitAudioContext
+        if (!AudioContextConstructor) return
+        audioContext = new AudioContextConstructor()
+        audioStateListener = syncSoundState
+        audioContext.addEventListener('statechange', audioStateListener)
       }
-      if (audioContext.state === 'suspended') void audioContext.resume()
+
+      if (audioContext.state === 'closed') return
+
+      // iOS Safari will often create a suspended context until audio is
+      // started inside the same user gesture. A silent source unlocks the
+      // output route without adding an audible click.
+      const unlockSource = audioContext.createBufferSource()
+      unlockSource.buffer = audioContext.createBuffer(
+        1,
+        1,
+        audioContext.sampleRate,
+      )
+      unlockSource.connect(audioContext.destination)
+      unlockSource.start(0)
+
+      if (audioContext.state === 'running') {
+        syncSoundState()
+        return
+      }
+
+      const contextToResume = audioContext
+      void contextToResume.resume()
+        .then(() => {
+          if (audioContext === contextToResume) syncSoundState()
+        })
+        .catch(() => {
+          if (audioContext === contextToResume) setSoundReady(false)
+        })
     }
 
     const playImpact = (strength: number) => {
@@ -694,6 +732,7 @@ function App() {
     canvas.addEventListener('pointermove', onPointerMove)
     canvas.addEventListener('pointerup', releasePointer)
     canvas.addEventListener('pointercancel', releasePointer)
+    canvas.addEventListener('click', ensureAudio)
     frame = requestAnimationFrame(render)
 
     return () => {
@@ -703,7 +742,13 @@ function App() {
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', releasePointer)
       canvas.removeEventListener('pointercancel', releasePointer)
-      if (audioContext) void audioContext.close()
+      canvas.removeEventListener('click', ensureAudio)
+      if (audioContext) {
+        if (audioStateListener) {
+          audioContext.removeEventListener('statechange', audioStateListener)
+        }
+        void audioContext.close()
+      }
     }
   }, [])
 
