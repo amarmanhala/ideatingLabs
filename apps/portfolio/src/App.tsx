@@ -42,6 +42,8 @@ const PALETTES: Palette[] = [
 
 const STORY_LINES = Array.from({ length: 11 }, () => 'Amarpreet Singh')
 const STORY_BAND_OFFSETS = STORY_LINES.map(() => Math.random() * Math.PI * 2)
+const GITHUB_GLOBE_LATITUDES = [-0.62, 0, 0.62]
+const GITHUB_GLOBE_ICON_COUNT = 6
 const GITHUB_ICON_PATH = 'M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.084-.729.084-.729 1.205.084 1.838 1.237 1.838 1.237 1.07 1.835 2.809 1.305 3.495.998.108-.776.418-1.305.762-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12'
 
 const clamp = (value: number, min: number, max: number) =>
@@ -163,7 +165,7 @@ function App() {
       balls = [
         {
           kind: 'github', x: left, y: floor - small, vx: 0, vy: 0,
-          radius: small, mass: small * small, rotationX: 0, rotationY: 0,
+          radius: small, mass: small * small, rotationX: -0.18, rotationY: 0,
         },
         {
           kind: 'story', x: center, y: floor - large, vx: 0, vy: 0,
@@ -386,8 +388,12 @@ function App() {
       context.arc(0, 0, radius, 0, Math.PI * 2)
       context.clip()
 
+      const isGlobe = ball.kind === 'story' || ball.kind === 'github'
       const baseColor = ball.kind === 'story' ? background : foreground
-      if (ball.kind === 'story') {
+      if (isGlobe) {
+        const highlight = ball.kind === 'github' ? 0.055 : 0.018
+        const midShadow = ball.kind === 'github' ? 0.025 : 0.011
+        const edgeShadow = ball.kind === 'github' ? 0.075 : 0.028
         const body = context.createRadialGradient(
           -radius * 0.38,
           -radius * 0.46,
@@ -396,10 +402,10 @@ function App() {
           radius * 0.08,
           radius * 1.08,
         )
-        body.addColorStop(0, mixColor(baseColor, '#ffffff', 0.018))
+        body.addColorStop(0, mixColor(baseColor, '#ffffff', highlight))
         body.addColorStop(0.42, baseColor)
-        body.addColorStop(0.78, mixColor(baseColor, '#000000', 0.011))
-        body.addColorStop(1, mixColor(baseColor, '#000000', 0.028))
+        body.addColorStop(0.78, mixColor(baseColor, '#000000', midShadow))
+        body.addColorStop(1, mixColor(baseColor, '#000000', edgeShadow))
         context.fillStyle = body
       } else {
         context.fillStyle = foreground
@@ -410,13 +416,39 @@ function App() {
       context.textBaseline = 'middle'
 
       if (ball.kind === 'github') {
-        const iconScale = radius * 0.92 / 24
-        context.save()
-        context.scale(iconScale, iconScale)
-        context.translate(-12, -12)
-        context.fillStyle = background
-        context.fill(githubIcon)
-        context.restore()
+        GITHUB_GLOBE_LATITUDES.forEach((latitude, latitudeIndex) => {
+          const latitudeCurve = Math.cos(latitude)
+          for (let iconIndex = 0; iconIndex < GITHUB_GLOBE_ICON_COUNT; iconIndex += 1) {
+            const longitude =
+              iconIndex / GITHUB_GLOBE_ICON_COUNT * Math.PI * 2 - Math.PI +
+              latitudeIndex % 2 * Math.PI / GITHUB_GLOBE_ICON_COUNT
+            const localX = latitudeCurve * Math.sin(longitude)
+            const localY = Math.sin(latitude)
+            const localZ = latitudeCurve * Math.cos(longitude)
+            const cosY = Math.cos(ball.rotationY)
+            const sinY = Math.sin(ball.rotationY)
+            const xAfterY = localX * cosY + localZ * sinY
+            const zAfterY = -localX * sinY + localZ * cosY
+            const cosX = Math.cos(ball.rotationX)
+            const sinX = Math.sin(ball.rotationX)
+            const yAfterX = localY * cosX - zAfterY * sinX
+            const zAfterX = localY * sinX + zAfterY * cosX
+            if (zAfterX <= 0.04) continue
+
+            const surfaceDepth = Math.max(0.08, zAfterX)
+            const iconScale = radius * 0.34 / 24
+            context.save()
+            context.translate(xAfterY * radius, yAfterX * radius)
+            context.scale(surfaceDepth ** 0.72, 0.88 + surfaceDepth * 0.12)
+            context.scale(iconScale, iconScale)
+            context.translate(-12, -12)
+            context.globalAlpha = surfaceDepth ** 0.6
+            context.fillStyle = background
+            context.fill(githubIcon)
+            context.restore()
+          }
+        })
+        context.globalAlpha = 1
       } else if (ball.kind === 'x') {
         context.save()
         context.scale(0.9, 1)
@@ -544,11 +576,13 @@ function App() {
         context.globalAlpha = 1
       }
 
-      if (ball.kind === 'story') {
+      if (isGlobe) {
+        const edgeOpacity = ball.kind === 'github' ? 0.095 : 0.025
+        const specularOpacity = ball.kind === 'github' ? 0.07 : 0.025
         const edgeFalloff = context.createRadialGradient(0, 0, radius * 0.5, 0, 0, radius)
         edgeFalloff.addColorStop(0, 'rgba(0,0,0,0)')
         edgeFalloff.addColorStop(0.76, 'rgba(0,0,0,0.015)')
-        edgeFalloff.addColorStop(1, 'rgba(0,0,0,0.025)')
+        edgeFalloff.addColorStop(1, `rgba(0,0,0,${edgeOpacity})`)
         context.fillStyle = edgeFalloff
         context.fillRect(-radius, -radius, radius * 2, radius * 2)
 
@@ -560,7 +594,7 @@ function App() {
           -radius * 0.48,
           radius * 0.55,
         )
-        specular.addColorStop(0, 'rgba(255,255,255,0.025)')
+        specular.addColorStop(0, `rgba(255,255,255,${specularOpacity})`)
         specular.addColorStop(1, 'rgba(255,255,255,0)')
         context.fillStyle = specular
         context.fillRect(-radius, -radius, radius * 2, radius * 2)
@@ -597,12 +631,13 @@ function App() {
             deformation.amount *= Math.pow(0.78, step * 60)
             if (deformation.amount < 0.002) deformation.amount = 0
           }
+          if (ball.kind === 'github') ball.rotationY += step * 0.18
           if (ball === draggedBall) {
             const moveX = (pointer.x - pointerOffset.x - ball.x) * 0.58
             const moveY = (pointer.y - pointerOffset.y - ball.y) * 0.58
             ball.x += moveX
             ball.y += moveY
-            if (ball.kind === 'story') {
+            if (ball.kind === 'story' || ball.kind === 'github') {
               ball.rotationY += moveX / Math.max(ball.radius, 1)
               ball.rotationX -= moveY / Math.max(ball.radius, 1)
             }
@@ -621,7 +656,7 @@ function App() {
           const moveY = ball.vy * step
           ball.x += moveX
           ball.y += moveY
-          if (ball.kind === 'story') {
+          if (ball.kind === 'story' || ball.kind === 'github') {
             ball.rotationY += moveX / Math.max(ball.radius, 1)
             ball.rotationX -= moveY / Math.max(ball.radius, 1)
           }
