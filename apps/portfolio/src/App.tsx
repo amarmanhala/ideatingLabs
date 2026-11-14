@@ -136,6 +136,7 @@ function App() {
     let balls: Ball[] = []
     let draggedBall: Ball | null = null
     let pointer: Point = { x: 0, y: 0 }
+    let pointerIsInside = false
     let pointerOffset: Point = { x: 0, y: 0 }
     let pointerDownAt = 0
     let pointerDownPoint: Point = { x: 0, y: 0 }
@@ -739,6 +740,12 @@ function App() {
       }
       activeBallContacts = contactsThisFrame
 
+      const isOverLink = pointerIsInside && !draggedBall && balls.some(
+        (ball) => BALL_LINKS[ball.kind] &&
+          Math.hypot(pointer.x - ball.x, pointer.y - ball.y) <= ball.radius,
+      )
+      canvas.classList.toggle('is-link', isOverLink)
+
       balls.forEach((ball) => drawSphere(ball, foreground, background, palettePulse, now))
       frame = requestAnimationFrame(render)
     }
@@ -757,6 +764,7 @@ function App() {
 
     const onPointerDown = (event: PointerEvent) => {
       void ensureAudio()
+      pointerIsInside = true
       pointer = getPointer(event)
       draggedBall = [...balls].reverse().find(
         (ball) => Math.hypot(pointer.x - ball.x, pointer.y - ball.y) <= ball.radius,
@@ -771,15 +779,9 @@ function App() {
     }
 
     const onPointerMove = (event: PointerEvent) => {
+      pointerIsInside = true
       pointer = getPointer(event)
-      if (!draggedBall) {
-        const isOverLink = balls.some(
-          (ball) => BALL_LINKS[ball.kind] &&
-            Math.hypot(pointer.x - ball.x, pointer.y - ball.y) <= ball.radius,
-        )
-        canvas.classList.toggle('is-link', isOverLink)
-        return
-      }
+      if (!draggedBall) return
       const now = performance.now()
       pointerHistory.push({ ...pointer, time: now })
       pointerHistory = pointerHistory.filter((sample) => now - sample.time < 120)
@@ -831,7 +833,15 @@ function App() {
     canvas.addEventListener('pointermove', onPointerMove)
     canvas.addEventListener('pointerup', releasePointer)
     canvas.addEventListener('pointercancel', releasePointer)
-    const onPointerLeave = () => { canvas.classList.remove('is-link') }
+    const onPointerEnter = (event: PointerEvent) => {
+      pointerIsInside = true
+      pointer = getPointer(event)
+    }
+    const onPointerLeave = () => {
+      pointerIsInside = false
+      canvas.classList.remove('is-link')
+    }
+    canvas.addEventListener('pointerenter', onPointerEnter)
     canvas.addEventListener('pointerleave', onPointerLeave)
     const onAudioGesture = () => { void ensureAudio() }
     canvas.addEventListener('click', onAudioGesture)
@@ -844,6 +854,7 @@ function App() {
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', releasePointer)
       canvas.removeEventListener('pointercancel', releasePointer)
+      canvas.removeEventListener('pointerenter', onPointerEnter)
       canvas.removeEventListener('pointerleave', onPointerLeave)
       canvas.removeEventListener('click', onAudioGesture)
       audioControlsRef.current = null
