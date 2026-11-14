@@ -588,9 +588,10 @@ function App() {
 
       const steps = 3
       const step = delta / steps
+      const ambientTime = now / 1000
       const contactsThisFrame = new Set<string>()
       for (let simulationStep = 0; simulationStep < steps; simulationStep += 1) {
-        balls.forEach((ball) => {
+        balls.forEach((ball, ballIndex) => {
           const deformation = deformations.get(ball)
           if (deformation) {
             deformation.amount *= Math.pow(0.78, step * 60)
@@ -609,6 +610,12 @@ function App() {
             ball.vy = 0
             return
           }
+          const speed = Math.hypot(ball.vx, ball.vy)
+          const ambientInfluence = clamp(1 - speed / 140, 0, 1)
+          const driftAcceleration = Math.sin(
+            ambientTime * 0.55 + ballIndex * 1.7,
+          ) * 22
+          ball.vx += driftAcceleration * ambientInfluence * step
           ball.vy += 620 * step
           const moveX = ball.vx * step
           const moveY = ball.vy * step
