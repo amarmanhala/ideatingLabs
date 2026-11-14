@@ -552,10 +552,10 @@ function App() {
           const latitude = (index - (STORY_LINES.length - 1) / 2) * latitudeStep
           const latitudeCurve = Math.cos(latitude)
           const ringRadius = latitudeCurve * radius
-          const fontSize = radius * (0.105 + latitudeCurve * 0.105)
-          context.font = `500 ${fontSize}px Arial, sans-serif`
-          const letterSpacing = fontSize * 0.12
-          const separator = '      '
+          const fontSize = radius * (0.12 + latitudeCurve * 0.12)
+          context.font = `700 ${fontSize}px Arial, sans-serif`
+          const letterSpacing = fontSize * 0.07
+          const separator = '  '
           const source = `${line}${separator}`
           const sourceWidth = [...source].reduce(
             (width, character) => width + context.measureText(character).width + letterSpacing,
