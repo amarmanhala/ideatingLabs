@@ -31,6 +31,12 @@ const BALL_LINKS: Partial<Record<BallKind, string>> = {
   email: 'mailto:amar.manhala@gmail.com',
 }
 
+const BALL_LABELS: Partial<Record<BallKind, string>> = {
+  github: 'GitHub',
+  x: 'X',
+  email: 'Email',
+}
+
 const PALETTES: Palette[] = [
   { background: '#00452f', foreground: '#ffe85a', name: 'forest + sun' },
   { background: '#f3f3f2', foreground: '#df4500', name: 'paper + ember' },
@@ -40,10 +46,31 @@ const PALETTES: Palette[] = [
   { background: '#ffe85a', foreground: '#00452f', name: 'sun + forest' },
 ]
 
-const STORY_LINES = Array.from({ length: 11 }, () => 'Amarpreet Singh')
+const STORY_LINES = [
+  'Designer',
+  'Amarpreet Singh',
+  'Developer',
+  'Designer',
+  'Developer',
+  'Amarpreet Singh',
+  'Designer',
+  'Developer',
+  'Amarpreet Singh',
+]
 const STORY_BAND_OFFSETS = STORY_LINES.map(() => Math.random() * Math.PI * 2)
-const GITHUB_GLOBE_LATITUDES = [-0.62, 0, 0.62]
-const GITHUB_GLOBE_WORD_COUNT = 5
+const GITHUB_ICON_PATH = 'M9.356 1.85C5.05 1.85 1.57 5.356 1.57 9.694a7.84 7.84 0 0 0 5.324 7.44c.387.079.528-.168.528-.376 0-.182-.013-.805-.013-1.454-2.165.467-2.616-.935-2.616-.935-.349-.91-.864-1.143-.864-1.143-.71-.48.051-.48.051-.48.787.051 1.2.805 1.2.805.695 1.194 1.817.857 2.268.649.064-.507.27-.857.49-1.052-1.728-.182-3.545-.857-3.545-3.87 0-.857.31-1.558.8-2.104-.078-.195-.349-1 .077-2.078 0 0 .657-.208 2.14.805a7.5 7.5 0 0 1 1.946-.26c.657 0 1.328.092 1.946.26 1.483-1.013 2.14-.805 2.14-.805.426 1.078.155 1.883.078 2.078.502.546.799 1.247.799 2.104 0 3.013-1.818 3.675-3.558 3.87.284.247.528.714.528 1.454 0 1.052-.012 1.896-.012 2.156 0 .208.142.455.528.377a7.84 7.84 0 0 0 5.324-7.441c.013-4.338-3.48-7.844-7.773-7.844'
+const GITHUB_ICON_POSITIONS = [
+  { latitude: -0.38, longitude: 0 },
+  { latitude: -0.38, longitude: Math.PI / 2 },
+  { latitude: -0.38, longitude: Math.PI },
+  { latitude: -0.38, longitude: -Math.PI / 2 },
+  { latitude: 0.38, longitude: Math.PI / 4 },
+  { latitude: 0.38, longitude: Math.PI * 0.75 },
+  { latitude: 0.38, longitude: -Math.PI * 0.75 },
+  { latitude: 0.38, longitude: -Math.PI / 4 },
+]
+const isSocialGlobe = (kind: BallKind) =>
+  kind === 'github' || kind === 'x' || kind === 'email'
 
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value))
@@ -121,6 +148,7 @@ function App() {
 
     const context = canvas.getContext('2d')
     if (!context) return
+    const githubIcon = new Path2D(GITHUB_ICON_PATH)
 
     let frame = 0
     let width = window.innerWidth
@@ -144,6 +172,8 @@ function App() {
     let lastImpactAt = 0
     let lastSoundAt = 0
     let initialized = false
+    let tooltipBall: Ball | null = null
+    let tooltipOpacity = 0
     let deformations = new Map<Ball, { amount: number; angle: number }>()
     let activeBallContacts = new Set<string>()
     const lastBallImpactAt = new Map<string, number>()
@@ -386,12 +416,13 @@ function App() {
       context.arc(0, 0, radius, 0, Math.PI * 2)
       context.clip()
 
-      const isGlobe = ball.kind === 'story' || ball.kind === 'github'
+      const socialGlobe = isSocialGlobe(ball.kind)
+      const isGlobe = ball.kind === 'story' || socialGlobe
       const baseColor = ball.kind === 'story' ? background : foreground
       if (isGlobe) {
-        const highlight = ball.kind === 'github' ? 0.055 : 0.018
-        const midShadow = ball.kind === 'github' ? 0.025 : 0.011
-        const edgeShadow = ball.kind === 'github' ? 0.075 : 0.028
+        const highlight = socialGlobe ? 0.055 : 0.018
+        const midShadow = socialGlobe ? 0.025 : 0.011
+        const edgeShadow = socialGlobe ? 0.075 : 0.028
         const body = context.createRadialGradient(
           -radius * 0.38,
           -radius * 0.46,
@@ -413,53 +444,72 @@ function App() {
       context.textAlign = 'center'
       context.textBaseline = 'middle'
 
-      if (ball.kind === 'github') {
-        GITHUB_GLOBE_LATITUDES.forEach((latitude, latitudeIndex) => {
-          const latitudeCurve = Math.cos(latitude)
-          const fontSize = radius * (0.17 + latitudeCurve * 0.05)
-          context.font = `500 ${fontSize}px Arial, sans-serif`
-          for (let wordIndex = 0; wordIndex < GITHUB_GLOBE_WORD_COUNT; wordIndex += 1) {
-            const longitude =
-              wordIndex / GITHUB_GLOBE_WORD_COUNT * Math.PI * 2 - Math.PI +
-              latitudeIndex % 2 * Math.PI / GITHUB_GLOBE_WORD_COUNT
-            const localX = latitudeCurve * Math.sin(longitude)
-            const localY = Math.sin(latitude)
-            const localZ = latitudeCurve * Math.cos(longitude)
-            const tangentX = latitudeCurve * Math.cos(longitude)
-            const tangentY = 0
-            const tangentZ = -latitudeCurve * Math.sin(longitude)
-            const cosY = Math.cos(ball.rotationY)
-            const sinY = Math.sin(ball.rotationY)
-            const xAfterY = localX * cosY + localZ * sinY
-            const zAfterY = -localX * sinY + localZ * cosY
-            const tangentXAfterY = tangentX * cosY + tangentZ * sinY
-            const tangentZAfterY = -tangentX * sinY + tangentZ * cosY
-            const cosX = Math.cos(ball.rotationX)
-            const sinX = Math.sin(ball.rotationX)
-            const yAfterX = localY * cosX - zAfterY * sinX
-            const zAfterX = localY * sinX + zAfterY * cosX
-            const tangentYAfterX = tangentY * cosX - tangentZAfterY * sinX
-            if (zAfterX <= 0.04) continue
+      const drawSocialGlobeIcons = (drawIcon: () => void) => {
+        const cosY = Math.cos(ball.rotationY)
+        const sinY = Math.sin(ball.rotationY)
+        const cosX = Math.cos(ball.rotationX)
+        const sinX = Math.sin(ball.rotationX)
+        const iconScale = radius * 0.86 / 19
 
-            const surfaceDepth = Math.max(0.08, zAfterX)
-            const tangentAngle = Math.atan2(tangentYAfterX, tangentXAfterY)
-            context.save()
-            context.translate(xAfterY * radius, yAfterX * radius)
-            context.rotate(tangentAngle)
-            context.scale(surfaceDepth ** 0.72, 0.88 + surfaceDepth * 0.12)
-            context.globalAlpha = surfaceDepth ** 0.6
-            context.fillStyle = background
-            context.fillText('GitHub', 0, 0)
-            context.restore()
-          }
+        GITHUB_ICON_POSITIONS.forEach(({ latitude, longitude }) => {
+          const latitudeCurve = Math.cos(latitude)
+          const sinLatitude = Math.sin(latitude)
+          const sinLongitude = Math.sin(longitude)
+          const cosLongitude = Math.cos(longitude)
+
+          const localX = latitudeCurve * sinLongitude
+          const localY = sinLatitude
+          const localZ = latitudeCurve * cosLongitude
+          const xAfterY = localX * cosY + localZ * sinY
+          const zAfterY = -localX * sinY + localZ * cosY
+          const yAfterX = localY * cosX - zAfterY * sinX
+          const zAfterX = localY * sinX + zAfterY * cosX
+          if (zAfterX <= 0.025) return
+
+          const eastX = cosLongitude
+          const eastY = 0
+          const eastZ = -sinLongitude
+          const eastXAfterY = eastX * cosY + eastZ * sinY
+          const eastZAfterY = -eastX * sinY + eastZ * cosY
+          const eastYAfterX = eastY * cosX - eastZAfterY * sinX
+
+          const northX = -sinLatitude * sinLongitude
+          const northY = latitudeCurve
+          const northZ = -sinLatitude * cosLongitude
+          const northXAfterY = northX * cosY + northZ * sinY
+          const northZAfterY = -northX * sinY + northZ * cosY
+          const northYAfterX = northY * cosX - northZAfterY * sinX
+
+          context.save()
+          context.translate(xAfterY * radius, yAfterX * radius)
+          context.transform(
+            eastXAfterY * iconScale,
+            eastYAfterX * iconScale,
+            northXAfterY * iconScale,
+            northYAfterX * iconScale,
+            0,
+            0,
+          )
+          context.translate(-9.5, -9.5)
+          context.globalAlpha = zAfterX ** 0.55
+          drawIcon()
+          context.restore()
+        })
+      }
+
+      if (ball.kind === 'github') {
+        drawSocialGlobeIcons(() => {
+          context.fillStyle = background
+          context.fill(githubIcon, 'evenodd')
         })
         context.globalAlpha = 1
       } else if (ball.kind === 'x') {
-        context.save()
-        context.scale(0.9, 1)
-        context.font = `300 ${radius * 1.16}px Arial, sans-serif`
-        context.fillText('𝕏', 0, radius * 0.02)
-        context.restore()
+        drawSocialGlobeIcons(() => {
+          context.fillStyle = background
+          context.font = '300 17px Arial, sans-serif'
+          context.fillText('𝕏', 9.5, 9.8)
+        })
+        context.globalAlpha = 1
       } else if (ball.kind === 'notes') {
         const iconSize = radius * 0.34
         const iconLeft = -iconSize * 0.5
@@ -489,38 +539,30 @@ function App() {
         context.font = `500 ${radius * 0.11}px Arial, sans-serif`
         context.fillText('project', 0, radius * 0.34)
       } else if (ball.kind === 'email') {
-        const label = 'email'
-        context.font = `400 ${radius * 0.43}px Arial, sans-serif`
-        const characters = [...label]
-        const widths = characters.map((character) => context.measureText(character).width)
-        const totalWidth = widths.reduce((sum, characterWidth) => sum + characterWidth, 0)
-        const angularSpan = totalWidth / Math.max(radius * 0.94, 1)
-        let cursor = 0
-        characters.forEach((character, characterIndex) => {
-          const characterWidth = widths[characterIndex]
-          const progress = (cursor + characterWidth * 0.5) / Math.max(totalWidth, 1)
-          const theta = (progress - 0.5) * angularSpan
-          const surfaceDepth = Math.max(0.2, Math.cos(theta))
-          context.save()
-          context.translate(Math.sin(theta) * radius * 0.94, 0)
-          context.scale(surfaceDepth, 1)
-          context.globalAlpha = surfaceDepth ** 0.45
-          context.fillText(character, 0, 0)
-          context.restore()
-          cursor += characterWidth
+        drawSocialGlobeIcons(() => {
+          context.strokeStyle = background
+          context.lineWidth = 1.7
+          context.lineCap = 'round'
+          context.lineJoin = 'round'
+          context.beginPath()
+          context.roundRect(2.2, 4.2, 14.6, 10.6, 1.8)
+          context.moveTo(3.3, 5.2)
+          context.lineTo(9.5, 10.1)
+          context.lineTo(15.7, 5.2)
+          context.stroke()
         })
         context.globalAlpha = 1
       } else {
         context.fillStyle = foreground
         STORY_LINES.forEach((line, index) => {
-          const latitudeStep = Math.PI / (STORY_LINES.length + 2)
+          const latitudeStep = Math.PI / (STORY_LINES.length + 1.4)
           const latitude = (index - (STORY_LINES.length - 1) / 2) * latitudeStep
           const latitudeCurve = Math.cos(latitude)
           const ringRadius = latitudeCurve * radius
-          const fontSize = radius * (0.11 + latitudeCurve * 0.12)
+          const fontSize = radius * (0.105 + latitudeCurve * 0.105)
           context.font = `500 ${fontSize}px Arial, sans-serif`
-          const letterSpacing = fontSize * 0.08
-          const separator = '     '
+          const letterSpacing = fontSize * 0.12
+          const separator = '      '
           const source = `${line}${separator}`
           const sourceWidth = [...source].reduce(
             (width, character) => width + context.measureText(character).width + letterSpacing,
@@ -582,8 +624,8 @@ function App() {
       }
 
       if (isGlobe) {
-        const edgeOpacity = ball.kind === 'github' ? 0.095 : 0.025
-        const specularOpacity = ball.kind === 'github' ? 0.07 : 0.025
+        const edgeOpacity = socialGlobe ? 0.095 : 0.025
+        const specularOpacity = socialGlobe ? 0.07 : 0.025
         const edgeFalloff = context.createRadialGradient(0, 0, radius * 0.5, 0, 0, radius)
         edgeFalloff.addColorStop(0, 'rgba(0,0,0,0)')
         edgeFalloff.addColorStop(0.76, 'rgba(0,0,0,0.015)')
@@ -604,6 +646,46 @@ function App() {
         context.fillStyle = specular
         context.fillRect(-radius, -radius, radius * 2, radius * 2)
       }
+      context.restore()
+    }
+
+    const drawTooltip = (
+      ball: Ball,
+      label: string,
+      foreground: string,
+      background: string,
+      opacity: number,
+    ) => {
+      context.save()
+      context.globalAlpha = opacity
+      context.font = '600 12px Arial, sans-serif'
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      const paddingX = 13
+      const tooltipHeight = 30
+      const tooltipWidth = context.measureText(label).width + paddingX * 2
+      const tooltipX = clamp(
+        ball.x,
+        tooltipWidth * 0.5 + 10,
+        width - tooltipWidth * 0.5 - 10,
+      )
+      const preferredY = ball.y - ball.radius - 18 - tooltipHeight * 0.5
+      const tooltipY = preferredY < 12
+        ? ball.y + ball.radius + 18 + tooltipHeight * 0.5
+        : preferredY
+
+      context.fillStyle = foreground
+      context.beginPath()
+      context.roundRect(
+        tooltipX - tooltipWidth * 0.5,
+        tooltipY - tooltipHeight * 0.5,
+        tooltipWidth,
+        tooltipHeight,
+        tooltipHeight * 0.5,
+      )
+      context.fill()
+      context.fillStyle = background
+      context.fillText(label, tooltipX, tooltipY + 0.5)
       context.restore()
     }
 
@@ -636,13 +718,13 @@ function App() {
             deformation.amount *= Math.pow(0.78, step * 60)
             if (deformation.amount < 0.002) deformation.amount = 0
           }
-          if (ball.kind === 'github') ball.rotationY += step * 0.18
+          if (isSocialGlobe(ball.kind)) ball.rotationY += step * 0.18
           if (ball === draggedBall) {
             const moveX = (pointer.x - pointerOffset.x - ball.x) * 0.58
             const moveY = (pointer.y - pointerOffset.y - ball.y) * 0.58
             ball.x += moveX
             ball.y += moveY
-            if (ball.kind === 'story' || ball.kind === 'github') {
+            if (ball.kind === 'story' || isSocialGlobe(ball.kind)) {
               ball.rotationY += moveX / Math.max(ball.radius, 1)
               ball.rotationX -= moveY / Math.max(ball.radius, 1)
             }
@@ -661,7 +743,7 @@ function App() {
           const moveY = ball.vy * step
           ball.x += moveX
           ball.y += moveY
-          if (ball.kind === 'story' || ball.kind === 'github') {
+          if (ball.kind === 'story' || isSocialGlobe(ball.kind)) {
             ball.rotationY += moveX / Math.max(ball.radius, 1)
             ball.rotationX -= moveY / Math.max(ball.radius, 1)
           }
@@ -787,13 +869,30 @@ function App() {
       }
       activeBallContacts = contactsThisFrame
 
-      const isOverLink = pointerIsInside && !draggedBall && balls.some(
-        (ball) => BALL_LINKS[ball.kind] &&
-          Math.hypot(pointer.x - ball.x, pointer.y - ball.y) <= ball.radius,
-      )
-      canvas.classList.toggle('is-link', isOverLink)
+      const hoveredLinkBall = pointerIsInside && !draggedBall
+        ? [...balls].reverse().find(
+          (ball) => BALL_LINKS[ball.kind] &&
+            Math.hypot(pointer.x - ball.x, pointer.y - ball.y) <= ball.radius,
+        ) ?? null
+        : null
+      canvas.classList.toggle('is-link', Boolean(hoveredLinkBall))
+
+      if (hoveredLinkBall) {
+        if (tooltipBall !== hoveredLinkBall) {
+          tooltipBall = hoveredLinkBall
+          tooltipOpacity = 0
+        }
+        tooltipOpacity = Math.min(1, tooltipOpacity + delta * 10)
+      } else {
+        tooltipOpacity = Math.max(0, tooltipOpacity - delta * 12)
+        if (tooltipOpacity === 0) tooltipBall = null
+      }
 
       balls.forEach((ball) => drawSphere(ball, foreground, background, palettePulse, now))
+      if (tooltipBall && tooltipOpacity > 0) {
+        const label = BALL_LABELS[tooltipBall.kind]
+        if (label) drawTooltip(tooltipBall, label, foreground, background, tooltipOpacity)
+      }
       frame = requestAnimationFrame(render)
     }
 
