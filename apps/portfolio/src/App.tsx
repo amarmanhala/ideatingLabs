@@ -52,8 +52,16 @@ const STORY_LINES = Array.from(
 )
 const STORY_BAND_OFFSETS = STORY_LINES.map(() => Math.random() * Math.PI * 2)
 const GITHUB_ICON_PATH = 'M9.356 1.85C5.05 1.85 1.57 5.356 1.57 9.694a7.84 7.84 0 0 0 5.324 7.44c.387.079.528-.168.528-.376 0-.182-.013-.805-.013-1.454-2.165.467-2.616-.935-2.616-.935-.349-.91-.864-1.143-.864-1.143-.71-.48.051-.48.051-.48.787.051 1.2.805 1.2.805.695 1.194 1.817.857 2.268.649.064-.507.27-.857.49-1.052-1.728-.182-3.545-.857-3.545-3.87 0-.857.31-1.558.8-2.104-.078-.195-.349-1 .077-2.078 0 0 .657-.208 2.14.805a7.5 7.5 0 0 1 1.946-.26c.657 0 1.328.092 1.946.26 1.483-1.013 2.14-.805 2.14-.805.426 1.078.155 1.883.078 2.078.502.546.799 1.247.799 2.104 0 3.013-1.818 3.675-3.558 3.87.284.247.528.714.528 1.454 0 1.052-.012 1.896-.012 2.156 0 .208.142.455.528.377a7.84 7.84 0 0 0 5.324-7.441c.013-4.338-3.48-7.844-7.773-7.844'
-const SOCIAL_ICON_COLOR = '#111515'
-const SOCIAL_ICON_BADGE_COLOR = '#f6f5f3'
+const GITHUB_ICON_POSITIONS = [
+  { latitude: -0.38, longitude: 0 },
+  { latitude: -0.38, longitude: Math.PI / 2 },
+  { latitude: -0.38, longitude: Math.PI },
+  { latitude: -0.38, longitude: -Math.PI / 2 },
+  { latitude: 0.38, longitude: Math.PI / 4 },
+  { latitude: 0.38, longitude: Math.PI * 0.75 },
+  { latitude: 0.38, longitude: -Math.PI * 0.75 },
+  { latitude: 0.38, longitude: -Math.PI / 4 },
+]
 const isSocialGlobe = (kind: BallKind) =>
   kind === 'github' || kind === 'x' || kind === 'email'
 
@@ -448,30 +456,68 @@ function App() {
       context.textAlign = 'center'
       context.textBaseline = 'middle'
 
-      const drawSocialIcon = (drawIcon: () => void) => {
-        const iconScale = radius * 0.72 / 19
+      const drawSocialGlobeIcons = (drawIcon: () => void) => {
+        const cosY = Math.cos(ball.rotationY)
+        const sinY = Math.sin(ball.rotationY)
+        const cosX = Math.cos(ball.rotationX)
+        const sinX = Math.sin(ball.rotationX)
+        const iconScale = radius * 0.86 / 19
 
-        context.save()
-        context.globalAlpha = 1
-        context.fillStyle = SOCIAL_ICON_BADGE_COLOR
-        context.beginPath()
-        context.arc(0, 0, radius * 0.46, 0, Math.PI * 2)
-        context.fill()
-        context.scale(iconScale, iconScale)
-        context.translate(-9.5, -9.5)
-        drawIcon()
-        context.restore()
+        GITHUB_ICON_POSITIONS.forEach(({ latitude, longitude }) => {
+          const latitudeCurve = Math.cos(latitude)
+          const sinLatitude = Math.sin(latitude)
+          const sinLongitude = Math.sin(longitude)
+          const cosLongitude = Math.cos(longitude)
+
+          const localX = latitudeCurve * sinLongitude
+          const localY = sinLatitude
+          const localZ = latitudeCurve * cosLongitude
+          const xAfterY = localX * cosY + localZ * sinY
+          const zAfterY = -localX * sinY + localZ * cosY
+          const yAfterX = localY * cosX - zAfterY * sinX
+          const zAfterX = localY * sinX + zAfterY * cosX
+          if (zAfterX <= 0.025) return
+
+          const eastX = cosLongitude
+          const eastY = 0
+          const eastZ = -sinLongitude
+          const eastXAfterY = eastX * cosY + eastZ * sinY
+          const eastZAfterY = -eastX * sinY + eastZ * cosY
+          const eastYAfterX = eastY * cosX - eastZAfterY * sinX
+
+          const northX = -sinLatitude * sinLongitude
+          const northY = latitudeCurve
+          const northZ = -sinLatitude * cosLongitude
+          const northXAfterY = northX * cosY + northZ * sinY
+          const northZAfterY = -northX * sinY + northZ * cosY
+          const northYAfterX = northY * cosX - northZAfterY * sinX
+
+          context.save()
+          context.translate(xAfterY * radius, yAfterX * radius)
+          context.transform(
+            eastXAfterY * iconScale,
+            eastYAfterX * iconScale,
+            northXAfterY * iconScale,
+            northYAfterX * iconScale,
+            0,
+            0,
+          )
+          context.translate(-9.5, -9.5)
+          context.globalAlpha = 1
+          drawIcon()
+          context.restore()
+        })
       }
 
       if (ball.kind === 'github') {
-        drawSocialIcon(() => {
-          context.fillStyle = SOCIAL_ICON_COLOR
+        drawSocialGlobeIcons(() => {
+          context.fillStyle = background
           context.fill(githubIcon, 'evenodd')
         })
         context.globalAlpha = 1
       } else if (ball.kind === 'x') {
-        drawSocialIcon(() => {
-          context.fillStyle = SOCIAL_ICON_COLOR
+        drawSocialGlobeIcons(() => {
+          context.fillStyle = background
           context.font = '300 17px Arial, sans-serif'
           context.fillText('𝕏', 9.5, 9.8)
         })
@@ -505,8 +551,8 @@ function App() {
         context.font = `500 ${radius * 0.11}px Arial, sans-serif`
         context.fillText('project', 0, radius * 0.34)
       } else if (ball.kind === 'email') {
-        drawSocialIcon(() => {
-          context.strokeStyle = SOCIAL_ICON_COLOR
+        drawSocialGlobeIcons(() => {
+          context.strokeStyle = background
           context.lineWidth = 1.7
           context.lineCap = 'round'
           context.lineJoin = 'round'
@@ -684,6 +730,7 @@ function App() {
             deformation.amount *= Math.pow(0.78, step * 60)
             if (deformation.amount < 0.002) deformation.amount = 0
           }
+          if (isSocialGlobe(ball.kind)) ball.rotationY += step * 0.18
           if (ball === draggedBall) {
             const targetX = clamp(
               pointer.x - pointerOffset.x,
@@ -699,7 +746,7 @@ function App() {
             const moveY = (targetY - ball.y) * 0.58
             ball.x += moveX
             ball.y += moveY
-            if (ball.kind === 'story') {
+            if (ball.kind === 'story' || isSocialGlobe(ball.kind)) {
               ball.rotationY += moveX / Math.max(ball.radius, 1)
               ball.rotationX -= moveY / Math.max(ball.radius, 1)
             }
@@ -718,7 +765,7 @@ function App() {
           const moveY = ball.vy * step
           ball.x += moveX
           ball.y += moveY
-          if (ball.kind === 'story') {
+          if (ball.kind === 'story' || isSocialGlobe(ball.kind)) {
             ball.rotationY += moveX / Math.max(ball.radius, 1)
             ball.rotationX -= moveY / Math.max(ball.radius, 1)
           }
