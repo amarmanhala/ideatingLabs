@@ -88,6 +88,13 @@ const mixColor = (from: string, to: string, amount: number) => {
   return `rgb(${mix(a.r, b.r)}, ${mix(a.g, b.g)}, ${mix(a.b, b.b)})`
 }
 
+const getBrowserThemeLead = () => {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+  return isIOS ? 180 : 0
+}
+
 const syncBrowserTheme = (background: string) => {
   const currentThemeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
   const nextThemeColor = document.createElement('meta')
@@ -168,6 +175,7 @@ function App() {
     let palette = 0
     let previousPalette = 0
     let paletteChangedAt = -1000
+    const browserThemeLead = getBrowserThemeLead()
     let audioContext: AudioContext | null = null
     let mediaUnlock: HTMLAudioElement | null = null
     let mediaUnlockUrl: string | null = null
@@ -392,7 +400,7 @@ function App() {
       const nextPalette = (palette + 1) % PALETTES.length
       syncBrowserTheme(PALETTES[nextPalette].background)
       palette = nextPalette
-      paletteChangedAt = now
+      paletteChangedAt = now + browserThemeLead
       setPaletteIndex(palette)
     }
 
