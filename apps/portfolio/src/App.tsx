@@ -88,6 +88,23 @@ const mixColor = (from: string, to: string, amount: number) => {
   return `rgb(${mix(a.r, b.r)}, ${mix(a.g, b.g)}, ${mix(a.b, b.b)})`
 }
 
+const syncBrowserTheme = (background: string) => {
+  const currentThemeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+  const nextThemeColor = document.createElement('meta')
+
+  nextThemeColor.name = 'theme-color'
+  nextThemeColor.content = background
+
+  if (currentThemeColor) {
+    currentThemeColor.replaceWith(nextThemeColor)
+  } else {
+    document.head.append(nextThemeColor)
+  }
+
+  document.documentElement.style.backgroundColor = background
+  document.body.style.backgroundColor = background
+}
+
 const createSilentAudioUrl = () => {
   const sampleRate = 8000
   const sampleCount = sampleRate / 4
@@ -123,15 +140,6 @@ function App() {
   const soundEnabledRef = useRef(true)
   const [paletteIndex, setPaletteIndex] = useState(0)
   const [soundEnabled, setSoundEnabled] = useState(true)
-
-  useEffect(() => {
-    const background = PALETTES[paletteIndex].background
-    const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
-
-    themeColor?.setAttribute('content', background)
-    document.documentElement.style.backgroundColor = background
-    document.body.style.backgroundColor = background
-  }, [paletteIndex])
 
   const toggleSound = () => {
     const enabled = !soundEnabledRef.current
@@ -381,7 +389,9 @@ function App() {
       if (now - lastImpactAt < 1250) return
       lastImpactAt = now
       previousPalette = palette
-      palette = (palette + 1) % PALETTES.length
+      const nextPalette = (palette + 1) % PALETTES.length
+      syncBrowserTheme(PALETTES[nextPalette].background)
+      palette = nextPalette
       paletteChangedAt = now
       setPaletteIndex(palette)
     }
