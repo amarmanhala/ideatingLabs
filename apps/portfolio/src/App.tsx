@@ -713,8 +713,18 @@ function App() {
           }
           if (isSocialGlobe(ball.kind)) ball.rotationY += step * 0.18
           if (ball === draggedBall) {
-            const moveX = (pointer.x - pointerOffset.x - ball.x) * 0.58
-            const moveY = (pointer.y - pointerOffset.y - ball.y) * 0.58
+            const targetX = clamp(
+              pointer.x - pointerOffset.x,
+              ball.radius,
+              width - ball.radius,
+            )
+            const targetY = clamp(
+              pointer.y - pointerOffset.y,
+              ball.radius,
+              height - ball.radius,
+            )
+            const moveX = (targetX - ball.x) * 0.58
+            const moveY = (targetY - ball.y) * 0.58
             ball.x += moveX
             ball.y += moveY
             if (ball.kind === 'story' || isSocialGlobe(ball.kind)) {
@@ -891,6 +901,11 @@ function App() {
 
     const getPointer = (event: PointerEvent): Point => ({ x: event.clientX, y: event.clientY })
 
+    const constrainBallToViewport = (ball: Ball) => {
+      ball.x = clamp(ball.x, ball.radius, width - ball.radius)
+      ball.y = clamp(ball.y, ball.radius, height - ball.radius)
+    }
+
     const openBallLink = (ball: Ball) => {
       const href = BALL_LINKS[ball.kind]
       if (!href) return
@@ -931,6 +946,7 @@ function App() {
       const now = performance.now()
       const releasedBall = draggedBall
       pointer = getPointer(event)
+      constrainBallToViewport(releasedBall)
       const pointerTravel = Math.hypot(
         pointer.x - pointerDownPoint.x,
         pointer.y - pointerDownPoint.y,
@@ -966,12 +982,31 @@ function App() {
       if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId)
     }
 
+    const cancelDrag = () => {
+      if (!draggedBall) return
+      constrainBallToViewport(draggedBall)
+      draggedBall.vx = 0
+      draggedBall.vy = 0
+      draggedBall = null
+      pointerHistory = []
+      canvas.classList.remove('is-dragging')
+    }
+
+    const onVisibilityChange = () => {
+      if (document.hidden) cancelDrag()
+    }
+
     resize()
     window.addEventListener('resize', resize)
     canvas.addEventListener('pointerdown', onPointerDown)
     canvas.addEventListener('pointermove', onPointerMove)
     canvas.addEventListener('pointerup', releasePointer)
     canvas.addEventListener('pointercancel', releasePointer)
+    canvas.addEventListener('lostpointercapture', cancelDrag)
+    window.addEventListener('pointerup', releasePointer)
+    window.addEventListener('pointercancel', releasePointer)
+    window.addEventListener('blur', cancelDrag)
+    document.addEventListener('visibilitychange', onVisibilityChange)
     const onPointerEnter = (event: PointerEvent) => {
       pointerIsInside = true
       pointer = getPointer(event)
@@ -993,6 +1028,11 @@ function App() {
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', releasePointer)
       canvas.removeEventListener('pointercancel', releasePointer)
+      canvas.removeEventListener('lostpointercapture', cancelDrag)
+      window.removeEventListener('pointerup', releasePointer)
+      window.removeEventListener('pointercancel', releasePointer)
+      window.removeEventListener('blur', cancelDrag)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
       canvas.removeEventListener('pointerenter', onPointerEnter)
       canvas.removeEventListener('pointerleave', onPointerLeave)
       canvas.removeEventListener('click', onAudioGesture)
