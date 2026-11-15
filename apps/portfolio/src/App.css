@@ -35,9 +35,9 @@
 }
 
 .site-header {
-  top: clamp(20px, 3vw, 42px);
-  left: clamp(20px, 3vw, 44px);
-  right: clamp(20px, 3vw, 44px);
+  top: max(clamp(20px, 3vw, 42px), calc(env(safe-area-inset-top) + 12px));
+  left: max(clamp(20px, 3vw, 44px), calc(env(safe-area-inset-left) + 20px));
+  right: max(clamp(20px, 3vw, 44px), calc(env(safe-area-inset-right) + 20px));
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -87,9 +87,9 @@
 .palette-line { width: 2.4rem; height: 1px; background: currentColor; opacity: 0.7; }
 
 .site-footer {
-  left: clamp(20px, 3vw, 44px);
-  right: clamp(20px, 3vw, 44px);
-  bottom: clamp(18px, 2.3vw, 34px);
+  left: max(clamp(20px, 3vw, 44px), calc(env(safe-area-inset-left) + 20px));
+  right: max(clamp(20px, 3vw, 44px), calc(env(safe-area-inset-right) + 20px));
+  bottom: max(clamp(18px, 2.3vw, 34px), calc(env(safe-area-inset-bottom) + 12px));
   display: flex;
   align-items: center;
   justify-content: space-between;

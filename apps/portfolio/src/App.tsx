@@ -124,6 +124,15 @@ function App() {
   const [paletteIndex, setPaletteIndex] = useState(0)
   const [soundEnabled, setSoundEnabled] = useState(true)
 
+  useEffect(() => {
+    const background = PALETTES[paletteIndex].background
+    const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+
+    themeColor?.setAttribute('content', background)
+    document.documentElement.style.backgroundColor = background
+    document.body.style.backgroundColor = background
+  }, [paletteIndex])
+
   const toggleSound = () => {
     const enabled = !soundEnabledRef.current
     soundEnabledRef.current = enabled
