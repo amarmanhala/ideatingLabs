@@ -88,13 +88,6 @@ const mixColor = (from: string, to: string, amount: number) => {
   return `rgb(${mix(a.r, b.r)}, ${mix(a.g, b.g)}, ${mix(a.b, b.b)})`
 }
 
-const getBrowserThemeLead = () => {
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-
-  return isIOS ? 180 : 0
-}
-
 const syncBrowserTheme = (background: string) => {
   const currentThemeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
   const nextThemeColor = document.createElement('meta')
@@ -175,7 +168,6 @@ function App() {
     let palette = 0
     let previousPalette = 0
     let paletteChangedAt = -1000
-    const browserThemeLead = getBrowserThemeLead()
     let audioContext: AudioContext | null = null
     let mediaUnlock: HTMLAudioElement | null = null
     let mediaUnlockUrl: string | null = null
@@ -400,7 +392,7 @@ function App() {
       const nextPalette = (palette + 1) % PALETTES.length
       syncBrowserTheme(PALETTES[nextPalette].background)
       palette = nextPalette
-      paletteChangedAt = now + browserThemeLead
+      paletteChangedAt = now
       setPaletteIndex(palette)
     }
 
@@ -715,7 +707,7 @@ function App() {
       const transition = clamp((now - paletteChangedAt) / 1200, 0, 1)
       const ease = transition * transition * (3 - 2 * transition)
       const palettePulse = 1 + Math.sin(transition * Math.PI) * 0.014
-      const background = mixColor(
+      const ballBackground = mixColor(
         PALETTES[previousPalette].background, PALETTES[palette].background, ease,
       )
       const foreground = mixColor(
@@ -724,7 +716,7 @@ function App() {
 
       context.setTransform(dpr, 0, 0, dpr, 0, 0)
       context.clearRect(0, 0, width, height)
-      context.fillStyle = background
+      context.fillStyle = PALETTES[palette].background
       context.fillRect(0, 0, width, height)
 
       const steps = 3
@@ -918,10 +910,10 @@ function App() {
         if (tooltipOpacity === 0) tooltipBall = null
       }
 
-      balls.forEach((ball) => drawSphere(ball, foreground, background, palettePulse, now))
+      balls.forEach((ball) => drawSphere(ball, foreground, ballBackground, palettePulse, now))
       if (tooltipBall && tooltipOpacity > 0) {
         const label = BALL_LABELS[tooltipBall.kind]
-        if (label) drawTooltip(tooltipBall, label, foreground, background, tooltipOpacity)
+        if (label) drawTooltip(tooltipBall, label, foreground, ballBackground, tooltipOpacity)
       }
       frame = requestAnimationFrame(render)
     }
