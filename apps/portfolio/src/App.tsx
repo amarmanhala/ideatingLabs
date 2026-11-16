@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
 type Point = { x: number; y: number }
-type BallKind = 'github' | 'story' | 'notes' | 'x' | 'email'
+type BallKind = 'github' | 'story' | 'notes' | 'things' | 'x' | 'email'
 
 type Ball = Point & {
   vx: number
@@ -33,6 +33,7 @@ const BALL_LINKS: Partial<Record<BallKind, string>> = {
 
 const BALL_LABELS: Partial<Record<BallKind, string>> = {
   github: 'GitHub',
+  things: 'Things',
   x: 'X',
   email: 'Email',
 }
@@ -134,12 +135,94 @@ const createSilentAudioUrl = () => {
   return URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }))
 }
 
+function VintageCasioWatch() {
+  const braceletLinks = Array.from({ length: 7 }, (_, index) => index)
+
+  return (
+    <svg
+      className="vintage-watch"
+      viewBox="0 0 360 640"
+      role="img"
+      aria-labelledby="watch-title watch-description"
+    >
+      <title id="watch-title">Vintage silver Casio digital watch</title>
+      <desc id="watch-description">
+        A stainless steel digital Casio watch with a rectangular black face and silver bracelet.
+      </desc>
+      <defs>
+        <linearGradient id="watch-steel" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#8e9497" />
+          <stop offset="0.18" stopColor="#eef0ef" />
+          <stop offset="0.5" stopColor="#aeb3b5" />
+          <stop offset="0.82" stopColor="#f7f8f7" />
+          <stop offset="1" stopColor="#858b8e" />
+        </linearGradient>
+        <linearGradient id="watch-screen" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#c8d0bd" />
+          <stop offset="1" stopColor="#aeb9a6" />
+        </linearGradient>
+        <filter id="watch-shadow" x="-30%" y="-20%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="14" stdDeviation="13" floodColor="#000" floodOpacity="0.2" />
+        </filter>
+      </defs>
+
+      <g fill="url(#watch-steel)" stroke="#747a7d" strokeWidth="2">
+        <path d="M126 12h108l-10 190h-88L126 12Z" />
+        <path d="M136 438h88l10 190H126l10-190Z" />
+        {braceletLinks.map((link) => (
+          <g key={`top-${link}`}>
+            <path d={`M${132 + link} ${28 + link * 23}h${96 - link * 2}l-2 17h-${92 - link * 2}Z`} />
+            <line x1="180" y1={30 + link * 23} x2="180" y2={43 + link * 23} opacity="0.45" />
+          </g>
+        ))}
+        {braceletLinks.map((link) => (
+          <g key={`bottom-${link}`}>
+            <path d={`M${138 - link} ${457 + link * 23}h${84 + link * 2}l2 17h-${88 + link * 2}Z`} />
+            <line x1="180" y1={460 + link * 23} x2="180" y2={473 + link * 23} opacity="0.45" />
+          </g>
+        ))}
+      </g>
+
+      <g filter="url(#watch-shadow)">
+        <path
+          d="M102 176c4-18 18-29 37-29h82c19 0 33 11 37 29l17 45v174l-17 45c-4 18-18 29-37 29h-82c-19 0-33-11-37-29l-17-45V221l17-45Z"
+          fill="url(#watch-steel)"
+          stroke="#656a6d"
+          strokeWidth="3"
+        />
+        <rect x="105" y="187" width="150" height="238" rx="12" fill="#17191a" stroke="#5d6264" strokeWidth="3" />
+        <text x="180" y="214" fill="#f2f2ef" fontFamily="Arial, sans-serif" fontSize="16" fontWeight="700" textAnchor="middle" letterSpacing="2">CASIO</text>
+        <text x="180" y="233" fill="#bfc4c4" fontFamily="Arial, sans-serif" fontSize="7" textAnchor="middle" letterSpacing="1.5">ALARM CHRONOGRAPH</text>
+        <rect x="121" y="249" width="118" height="93" rx="4" fill="url(#watch-screen)" stroke="#676d68" strokeWidth="4" />
+        <text x="132" y="271" fill="#202521" fontFamily="Arial, sans-serif" fontSize="10" fontWeight="700">SU</text>
+        <text x="226" y="271" fill="#202521" fontFamily="Arial, sans-serif" fontSize="10" fontWeight="700" textAnchor="end">16</text>
+        <text x="180" y="320" fill="#171b18" fontFamily="monospace" fontSize="50" fontWeight="700" textAnchor="middle" letterSpacing="-4">10:58</text>
+        <text x="180" y="367" fill="#e6e7e3" fontFamily="Arial, sans-serif" fontSize="8" textAnchor="middle" letterSpacing="1.8">WATER RESIST</text>
+        <circle cx="116" cy="390" r="4" fill="#d04b3d" />
+        <text x="180" y="397" fill="#aeb3b3" fontFamily="Arial, sans-serif" fontSize="7" textAnchor="middle" letterSpacing="1.2">LIGHT · MODE · START</text>
+      </g>
+    </svg>
+  )
+}
+
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const audioControlsRef = useRef<AudioControls | null>(null)
   const soundEnabledRef = useRef(true)
   const [paletteIndex, setPaletteIndex] = useState(0)
   const [soundEnabled, setSoundEnabled] = useState(true)
+  const [thingsOpen, setThingsOpen] = useState(false)
+
+  useEffect(() => {
+    syncBrowserTheme(thingsOpen ? '#ffffff' : PALETTES[paletteIndex].background)
+    if (!thingsOpen) return
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setThingsOpen(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [paletteIndex, thingsOpen])
 
   const toggleSound = () => {
     const enabled = !soundEnabledRef.current
@@ -197,6 +280,7 @@ function App() {
       const left = Math.max(small + 20, width * 0.105)
       const center = width < 720 ? width * 0.5 : width * 0.31
       const notes = width < 720 ? width * 0.76 : width * 0.555
+      const things = width < 720 ? width * 0.18 : width * 0.66
       const rightA = width < 720 ? width * 0.72 : width * 0.74
       const rightB = width < 720 ? width * 0.84 : width * 0.91
 
@@ -212,6 +296,10 @@ function App() {
         {
           kind: 'notes', x: notes, y: floor - medium, vx: 0, vy: 0,
           radius: medium, mass: medium * medium, rotationX: 0, rotationY: 0,
+        },
+        {
+          kind: 'things', x: things, y: floor - small * 3, vx: 0, vy: 0,
+          radius: small, mass: small * small, rotationX: 0, rotationY: 0,
         },
         {
           kind: 'x', x: rightA, y: floor - small, vx: 0, vy: 0,
@@ -233,10 +321,12 @@ function App() {
         balls[1].y = floor - large * 1.02
         balls[2].x = width * 0.76
         balls[2].y = floor - medium * 3.1
-        balls[3].x = width * 0.73
-        balls[3].y = floor - small * 1.92
-        balls[4].x = width * 0.83
-        balls[4].y = floor - small * 0.82
+        balls[3].x = width * 0.18
+        balls[3].y = floor - small * 4.7
+        balls[4].x = width * 0.73
+        balls[4].y = floor - small * 1.92
+        balls[5].x = width * 0.83
+        balls[5].y = floor - small * 0.82
       }
 
       for (let pass = 0; pass < 8; pass += 1) {
@@ -550,6 +640,12 @@ function App() {
         context.fillText('notes', 0, radius * 0.04)
         context.font = `500 ${radius * 0.11}px Arial, sans-serif`
         context.fillText('project', 0, radius * 0.34)
+      } else if (ball.kind === 'things') {
+        context.fillStyle = background
+        context.font = `600 ${radius * 0.25}px Arial, sans-serif`
+        context.fillText('things', 0, -radius * 0.025)
+        context.font = `500 ${radius * 0.1}px Arial, sans-serif`
+        context.fillText('collection', 0, radius * 0.25)
       } else if (ball.kind === 'email') {
         drawSocialGlobeIcons(() => {
           context.strokeStyle = background
@@ -893,7 +989,7 @@ function App() {
 
       const hoveredLinkBall = pointerIsInside && !draggedBall
         ? [...balls].reverse().find(
-          (ball) => BALL_LINKS[ball.kind] &&
+          (ball) => (BALL_LINKS[ball.kind] || ball.kind === 'things') &&
             Math.hypot(pointer.x - ball.x, pointer.y - ball.y) <= ball.radius,
         ) ?? null
         : null
@@ -925,7 +1021,11 @@ function App() {
       ball.y = clamp(ball.y, ball.radius, height - ball.radius)
     }
 
-    const openBallLink = (ball: Ball) => {
+    const activateBall = (ball: Ball) => {
+      if (ball.kind === 'things') {
+        setThingsOpen(true)
+        return
+      }
       const href = BALL_LINKS[ball.kind]
       if (!href) return
       const link = document.createElement('a')
@@ -978,7 +1078,7 @@ function App() {
         void ensureAudio().then((ready) => {
           if (ready) playImpact(140)
         })
-        openBallLink(releasedBall)
+        activateBall(releasedBall)
       } else {
         const velocitySamples = [
           ...pointerHistory.filter((sample) => now - sample.time <= 110),
@@ -1067,8 +1167,33 @@ function App() {
       <canvas
         ref={canvasRef}
         className="physics-stage"
-        aria-label="Interactive portfolio playground with a Notes project ball. Tap the GitHub, X, or email balls to open their links, or drag and throw any ball."
+        aria-label="Interactive portfolio playground with Notes and Things balls. Tap Things to view the collection, tap the GitHub, X, or email balls to open their links, or drag and throw any ball."
       />
+      {thingsOpen && (
+        <section
+          className="things-view"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="things-title"
+        >
+          <button
+            type="button"
+            className="things-close"
+            onClick={() => setThingsOpen(false)}
+            autoFocus
+          >
+            close
+          </button>
+          <div className="things-heading">
+            <span>things / 01</span>
+            <h1 id="things-title">Vintage Casio</h1>
+          </div>
+          <figure className="watch-figure">
+            <VintageCasioWatch />
+            <figcaption>Vintage Casio digital watch</figcaption>
+          </figure>
+        </section>
+      )}
       <header className="site-header">
         <div className="wordmark" aria-hidden="true">
           DESIGNER / DEVELOPER / DESIGN ENGINEER

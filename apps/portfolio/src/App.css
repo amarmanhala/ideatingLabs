@@ -20,6 +20,84 @@
 .physics-stage.is-link { cursor: pointer; }
 .physics-stage.is-dragging { cursor: grabbing; }
 
+.things-view {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  min-height: 100svh;
+  padding:
+    max(24px, env(safe-area-inset-top))
+    max(24px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom))
+    max(24px, env(safe-area-inset-left));
+  overflow: auto;
+  color: #111515;
+  background: #fff;
+}
+
+.things-heading {
+  position: fixed;
+  top: max(24px, calc(env(safe-area-inset-top) + 12px));
+  left: max(24px, calc(env(safe-area-inset-left) + 20px));
+  z-index: 1;
+  text-transform: uppercase;
+}
+
+.things-heading span,
+.watch-figure figcaption,
+.things-close {
+  font-size: 0.72rem;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.things-heading span { opacity: 0.5; }
+
+.things-heading h1 {
+  margin: 0.55rem 0 0;
+  font-size: clamp(1.35rem, 2.8vw, 2.4rem);
+  line-height: 0.95;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  text-transform: none;
+}
+
+.things-close {
+  position: fixed;
+  top: max(24px, calc(env(safe-area-inset-top) + 12px));
+  right: max(24px, calc(env(safe-area-inset-right) + 20px));
+  z-index: 2;
+  padding: 0.2rem 0 0.35rem;
+  color: #111515;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  cursor: pointer;
+}
+
+.things-close:hover { opacity: 0.55; }
+.things-close:focus-visible { outline: 1px solid currentColor; outline-offset: 5px; }
+
+.watch-figure {
+  display: grid;
+  width: min(72vw, 430px);
+  margin: auto;
+  place-items: center;
+}
+
+.vintage-watch {
+  display: block;
+  width: 100%;
+  height: min(72svh, 680px);
+}
+
+.watch-figure figcaption {
+  margin-top: -0.75rem;
+  opacity: 0.48;
+}
+
 .site-header,
 .site-footer,
 .palette-status {
@@ -103,4 +181,7 @@
 @media (max-width: 720px) {
   .palette-status,
   .site-footer span { display: none; }
+
+  .watch-figure { width: min(92vw, 350px); }
+  .vintage-watch { height: min(70svh, 600px); }
 }
